@@ -1,22 +1,37 @@
-version: '3.8'
+name: Flyway CI/CD
 
-services:
-  postgres:
-    image: postgres:15
-    container_name: flyway_postgres
-    environment:
-      POSTGRES_DB: demo_db
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: pass
-    ports:
-      - "5432:5432"
+on:
+  push:
+    branches:
+      - main
 
-  flyway:
-    image: flyway/flyway:latest
-    container_name: flyway_migration
-    command: -configFiles=/flyway/conf/flyway.conf migrate
-    volumes:
-      - ./flyway/sql:/flyway/sql
-      - ./flyway/conf:/flyway/conf
-    depends_on:
-      - postgres
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: demo_db
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U user -d demo_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flyway
+        uses: red-gate/flyway-action@v2
+        with:
+          url: jdbc:postgresql://localhost:5432/demo_db
+          user: user
+          password: pass
+          locations: filesystem:flyway/sql
